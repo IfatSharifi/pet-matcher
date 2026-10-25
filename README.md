@@ -1,0 +1,101 @@
+# Lost & Found Pet Matcher - matching core (Days 1-2)
+
+Answers one question with numbers: **when someone reports a found pet, does the real owner's pet show up in the top 5?**
+
+It embeds every photo with an image model, searches for the nearest "lost" photos, and reports recall@1, recall@5 and MRR per model.
+
+| Model | What it is |
+| --- | --- |
+| `histogram` | Color-histogram baseline, no download. Any real model must beat it. |
+| `clip` | OpenAI CLIP ViT-B/32, general image-text model |
+| `dinov2` | Meta DINOv2-small, self-supervised; strong on fine visual detail |
+
+## Results so far: DINOv2 wins clearly
+
+DogFaceNet: 1,393 dogs, 8,363 photos; 1,393 found-report queries against a 6,970-photo gallery. Three random splits (seeds 0-2); full history in `results\benchmark_log.csv`.
+
+| Model | recall@1 | recall@5 | MRR |
+| --- | --- | --- | --- |
+| **DINOv2-small** | **84.6-85.7%** | **94.8-95.5%** | **0.893-0.898** |
+| CLIP ViT-B/32 | 56.4-58.1% | 73.0-73.9% | 0.636-0.649 |
+| Color histogram (baseline) | 15.7% | 24.5% | 0.203 |
+
+DINOv2 embeds about 26 photos/second on a 2-core CPU, so a single new report takes well under a second.
+
+**Where it fails** (`results\dinov2_misses_sample.png`: found photo, true dog, model's wrong pick): about half the misses are black or very dark dogs; the rest are look-alike mixes (tan, black-and-tan, shepherd types), tilted heads and blurry or dim photos. These are the cases the planned re-rank by attributes, distance and date should fix.
+
+**Caveat:** DogFaceNet photos are cropped, aligned faces. Real lost-pet photos show the whole body from any angle, so expect lower numbers until a face/body detection step and a real-world test set are added.
+
+## Setup on Windows (one time)
+
+1. Install **Python 3.12** from python.org and tick "Add python.exe to PATH".
+2. Unzip this folder, e.g. to `Documents\pet-matcher`, and open PowerShell there.
+3. Create a virtual environment and install packages:
+
+```powershell
+py -3.12 -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+pip install -r requirements.txt
+```
+
+If PowerShell blocks the activate script, run once: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
+
+4. Check everything works (no downloads needed):
+
+```powershell
+python -m unittest discover tests
+```
+
+## Get photos
+
+**Quick start - your own photos.** One folder per pet, at least 2 photos each (more is better). Photos of single pets with only one photo are welcome too: they act as distractors.
+
+```
+data\my_pets\
+    bamba\     img1.jpg  img2.jpg  img3.jpg
+    shuki\     a.jpg  b.jpg
+    neighbors_cat\  x.jpg
+```
+
+Vary the photos the way real reports vary: indoor vs. street, side vs. face, night, blurry phone shots.
+
+**Benchmark scale - DogFaceNet (used for the results above, MIT license).** One command downloads it into `data\dogfacenet` (94 MB, about 3 minutes):
+
+```powershell
+python scripts\fetch_dogfacenet.py
+python run_benchmark.py --data data\dogfacenet --models histogram clip dinov2
+```
+
+**More species - PetFace.** Download from the [PetFace project page](https://dahlian00.github.io/PetFacePage/) following its terms (non-commercial research only). Then make a CSV with two columns, `path,pet_id`, one row per image (paths relative to the CSV's folder). Start with dogs and cats.
+
+## Run
+
+```powershell
+python run_benchmark.py --data data\my_pets
+python run_benchmark.py --csv data\petface\dogs.csv --max-pets 300 --models histogram clip dinov2
+```
+
+The first run downloads each model once (roughly 100-600 MB each). Embeddings are cached per photo in `.cache\`, so re-runs and new splits (`--seed 1`) take seconds. On a laptop CPU, expect a few minutes per 1,000 photos.
+
+## Outputs
+
+- **Terminal table** - recall@1, recall@5, MRR and embedding time per model.
+- **`results\benchmark_log.csv`** - one row per model per run. Keep it in git: it's your eval history and an interview artifact.
+- **`results\misses_<model>.csv`** - every found-report where the true pet was NOT in the top 5. Open the photos and look for patterns (dark fur? side view? similar breed?). That list drives the next improvement.
+
+## How the split works
+
+For each pet with 2+ photos, one random photo is the "found" report (query) and the rest are the owner's "lost" report (gallery). Pets with one photo stay in the gallery as distractors. Results are de-duplicated by pet, because a user sees a list of pets, not photos. `--seed` makes a split repeatable; change it to check the numbers are stable.
+
+## Project layout
+
+```
+petmatch\data.py        load folders or CSV, make the query/gallery split
+petmatch\embedders.py   histogram, CLIP and DINOv2 embedders + disk cache
+petmatch\index.py       in-memory cosine vector index (pgvector replaces it in the API phase)
+petmatch\metrics.py     recall@k, MRR, de-duplicated ranks
+run_benchmark.py        the CLI
+scripts\fetch_dogfacenet.py  downloads the DogFaceNet benchmark
+tests\test_core.py      tests that run without any model download
+```
