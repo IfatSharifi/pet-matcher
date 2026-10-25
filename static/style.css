@@ -1,0 +1,160 @@
+/* חוזרים הביתה - the Israeli lost-pet street flyer, made usable on a phone.
+   One loud element (the home flyers); everything else stays quiet. */
+/* Self-hosted (SIL Open Font License, static/fonts/OFL.txt): no third-party requests. */
+@font-face { font-family: "Secular One"; src: url("/static/fonts/SecularOne-Regular.ttf") format("truetype");
+  font-weight: 400; font-display: swap; }
+@font-face { font-family: "Assistant"; src: url("/static/fonts/Assistant-Variable.ttf") format("truetype");
+  font-weight: 200 800; font-display: swap; }
+
+:root {
+  --paper: #f6f7f9;
+  --sheet: #ffffff;
+  --ink: #1b2a3a;
+  --muted: #5a6675;
+  --line: #d9dee5;
+  --lost: #c8102e;
+  --found: #0e7c66;
+  --focus: #2a6fdb;
+  --display: "Secular One", "Assistant", Arial, sans-serif;
+  --text: "Assistant", Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 1.0625rem/1.6 var(--text);
+}
+main { max-width: 42rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+a { color: inherit; text-underline-offset: 3px; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+/* ---- header / footer */
+header.site {
+  display: flex; align-items: baseline; gap: .75rem; flex-wrap: wrap;
+  max-width: 42rem; margin: 0 auto; padding: 1.25rem 1rem .5rem;
+}
+.brand { font: 1.5rem/1 var(--display); text-decoration: none; }
+.tagline { color: var(--muted); font-size: .95rem; }
+footer.site {
+  max-width: 42rem; margin: 0 auto; padding: 1.5rem 1rem 2.5rem;
+  color: var(--muted); font-size: .9rem; border-top: 1px solid var(--line);
+}
+
+/* ---- home: two flyers on a board */
+.board { display: grid; gap: 1.25rem; grid-template-columns: 1fr; margin-top: .5rem; }
+@media (min-width: 40rem) { .board { grid-template-columns: 1fr 1fr; } }
+.flyer {
+  display: flex; flex-direction: column; gap: .75rem;
+  background: var(--sheet); text-decoration: none; color: var(--ink);
+  padding: 1.5rem 1.25rem 0; border: 1px solid var(--line); border-radius: 2px;
+  box-shadow: 0 1px 0 var(--line), 0 10px 22px -16px rgba(27, 42, 58, .45);
+  transform: rotate(-.6deg);
+}
+.flyer.found { transform: rotate(.5deg); }
+.flyer-word { font: clamp(3.5rem, 15vw, 5.25rem)/.95 var(--display); letter-spacing: -.01em; }
+.flyer.lost .flyer-word { color: var(--lost); }
+.flyer.found .flyer-word { color: var(--found); }
+.flyer-text { font-size: 1.05rem; max-width: 30ch; }
+.flyer-cta {
+  margin: 0 -1.25rem; padding: .85rem 1.25rem; font-weight: 700; color: #fff;
+}
+.flyer.lost .flyer-cta { background: var(--lost); }
+.flyer.found .flyer-cta { background: var(--found); }
+/* the tear-off strips at the bottom of a street flyer */
+.tabs { display: flex; margin: .5rem -1.25rem 0; border-top: 2px dashed var(--line); }
+.tabs i { flex: 1; height: 2.75rem; border-inline-start: 1px dashed var(--line); }
+.tabs i:first-child { border-inline-start: 0; }
+.flyer:hover .flyer-word { text-decoration: underline; text-decoration-thickness: 4px; text-underline-offset: 8px; }
+@media (prefers-reduced-motion: no-preference) {
+  .flyer { transition: transform .15s ease; }
+  .flyer:hover { transform: rotate(0); }
+}
+.screenshot-hint { margin-top: 2rem; font-size: 1.05rem; }
+
+/* ---- page titles and notes */
+.page-title { font: clamp(1.9rem, 6vw, 2.5rem)/1.15 var(--display); margin: .5rem 0 1.25rem; }
+.page-title.lost { color: var(--lost); }
+.page-title.found { color: var(--found); }
+.note { background: var(--sheet); border-inline-start: 4px solid var(--ink); padding: .75rem 1rem; margin: 0 0 1.25rem; }
+.note p { margin: .25rem 0; }
+.error { background: #fdecee; border-inline-start: 4px solid var(--lost); padding: .75rem 1rem; font-weight: 600; }
+.empty { background: var(--sheet); border: 1px dashed var(--line); padding: 1.25rem; }
+.hint { color: var(--muted); font-size: .95rem; margin: 0 0 .75rem; }
+
+/* ---- report form */
+form.report fieldset {
+  background: var(--sheet); border: 1px solid var(--line); border-radius: 2px;
+  margin: 0 0 1rem; padding: 1rem 1.1rem 1.25rem;
+}
+form.report legend { font: 1.25rem/1.2 var(--display); padding: 0 .35rem; }
+label { display: block; font-weight: 600; margin: .75rem 0 .3rem; }
+input[type=text], input[type=tel], input[type=email], input[type=date] {
+  width: 100%; font: inherit; color: inherit; padding: .65rem .75rem;
+  border: 1px solid #b8c0cb; border-radius: 2px; background: #fff;
+}
+input[dir=ltr] { text-align: right; }
+.file-button { display: inline-block; margin: 0 0 0 .75rem; position: relative; }
+.file-button input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+.file-button span {
+  display: inline-block; font-weight: 700; border: 1px solid var(--ink); border-radius: 2px;
+  padding: .55rem 1rem; background: #fff;
+}
+.file-button:has(input:focus-visible) span { outline: 3px solid var(--focus); outline-offset: 2px; }
+.file-count { color: var(--muted); }
+.close-report { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+.close-report p { margin: 0; }
+.map { height: 15rem; border: 1px solid var(--line); margin-bottom: .5rem; z-index: 0; }
+.link-button { background: none; border: 0; padding: .25rem 0; font: inherit; font-weight: 600;
+  color: var(--focus); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+
+.choices { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.choice { margin: 0; font-weight: 600; display: flex; align-items: center; gap: .35rem;
+  border: 1px solid var(--line); padding: .45rem .8rem; border-radius: 2px; cursor: pointer; }
+.choice:has(input:checked) { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+
+.swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr)); gap: .4rem; }
+.swatch { margin: 0; font-weight: 400; display: flex; align-items: center; gap: .5rem;
+  border: 1px solid var(--line); padding: .4rem .55rem; border-radius: 2px; cursor: pointer; }
+.swatch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.swatch .chip { width: 1.4rem; height: 1.4rem; border-radius: 50%; border: 1px solid #9aa3ae; flex: none; }
+.swatch:has(input:checked) { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); font-weight: 700; }
+.swatch:has(input:focus-visible) { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+button.primary {
+  width: 100%; font: 1.2rem/1.2 var(--display); color: #fff; background: var(--ink);
+  border: 0; border-radius: 2px; padding: 1rem; cursor: pointer;
+}
+button.primary.lost { background: var(--lost); }
+button.primary.found { background: var(--found); }
+button.secondary {
+  font: inherit; font-weight: 700; background: none; color: var(--ink);
+  border: 1px solid var(--ink); border-radius: 2px; padding: .5rem .9rem; cursor: pointer; margin-top: .75rem;
+}
+
+/* ---- matches */
+ol.matches { list-style: none; padding: 0; margin: 0; }
+.match {
+  display: grid; grid-template-columns: 6.5rem 1fr; gap: 1rem;
+  background: var(--sheet); border: 1px solid var(--line); padding: 1rem; margin-bottom: 1rem; border-radius: 2px;
+}
+.match.strong { border-color: var(--found); box-shadow: inset -4px 0 0 var(--found); }
+.thumb { width: 6.5rem; height: 6.5rem; object-fit: cover; border-radius: 2px; background: var(--paper); }
+.thumb.none { display: flex; }
+.thumb.none span { flex: 1; }
+.match h2 { font: 1.3rem/1.25 var(--display); margin: 0 0 .25rem; }
+.badge { display: inline-block; margin: 0 0 .35rem; color: var(--found); font-weight: 700; }
+.where { margin: 0 0 .5rem; color: var(--muted); }
+.reasons { margin: 0; padding-inline-start: 1.1rem; }
+.reasons li { margin: .1rem 0; }
+/* contact details styled as a flyer's tear-off strip */
+.tear { margin-top: .9rem; padding-top: .7rem; border-top: 2px dashed var(--line); }
+.tear-label { margin: 0; font-weight: 700; }
+.tear p { margin: .15rem 0; }
+.tear a { margin-inline-end: .75rem; font-weight: 600; }
+@media (max-width: 26rem) {
+  .match { grid-template-columns: 1fr; }
+  .thumb { width: 100%; height: 12rem; }
+}

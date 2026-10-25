@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}חוזרים הביתה{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <header class="site">
+    <a class="brand" href="/">חוזרים הביתה</a>
+    <span class="tagline">לוח אבודים ונמצאים לחיות מחמד</span>
+  </header>
+  <main>
+    {% block main %}{% endblock %}
+  </main>
+  <footer class="site">
+    ההתאמות נעשות אוטומטית ועלולות לטעות. לעולם אל תשלמו מראש למי שטוען שמצא את החיה שלכם.
+  </footer>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

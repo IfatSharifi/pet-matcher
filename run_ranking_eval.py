@@ -128,6 +128,27 @@ def main() -> None:
                              **{k: round(v, 4) for k, v in m.items()},
                              "w_color": w.color, "w_dist": w.dist, "w_date": w.date})
 
+        # alert calibration: email only when the #1 match scores above a threshold.
+        # precision = share of alerts that point at the right dog; coverage = share of reports alerted.
+        for cname in ("+ place & date", "no photo: + colors"):
+            s_cfg = score(f_test, tuned[cname])
+            top1 = s_cfg.argmax(axis=1)
+            top_score = s_cfg.max(axis=1)
+            correct = top1 == truth[test]
+            order_s = np.sort(top_score)
+            picks = []
+            for target in (0.95, 0.99):
+                ok = [t for t in order_s if correct[top_score >= t].mean() >= target]
+                if ok:
+                    t = float(ok[0])
+                    picks.append(f"precision>={target:.0%}: score>={t:.3f} alerts {np.mean(top_score >= t):.0%}")
+                    log_rows.append({"timestamp": datetime.now().isoformat(timespec="seconds"), "scenario": name,
+                                     "config": f"alert@{target:.0%} {cname}", "seed": args.seed,
+                                     "test_queries": len(test), "recall@1": round(float(np.mean(top_score >= t)), 4),
+                                     "recall@5": "", "mrr": "", "w_color": "", "w_dist": "", "w_date": "",
+                                     "threshold": round(t, 4)})
+            print(f"  alerts ({cname}): " + "; ".join(picks))
+
         # which image-only misses did the full ranking fix, by the found dog's main color?
         r_img = true_ranks(score(f_test, tuned["image only"]), truth[test])
         r_all = true_ranks(score(f_test, tuned["all"]), truth[test])
@@ -151,8 +172,9 @@ def main() -> None:
                     lines.append(f"{rank}. {mark} {lost_ids[j]} - {reason}")
                 examples.append("\n".join(lines))
 
+    fields = list(dict.fromkeys(k for r in log_rows for k in r))
     with (RESULTS / "ranking_log.csv").open("a", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=list(log_rows[0]))
+        w = csv.DictWriter(f, fieldnames=fields, restval="")
         if f.tell() == 0:
             w.writeheader()
         w.writerows(log_rows)

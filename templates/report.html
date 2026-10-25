@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}{{ "חיה שנעלמה" if side == "lost" else "חיה שנמצאה" }} | חוזרים הביתה{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="/static/leaflet/leaflet.css">
+{% endblock %}
+{% block main %}
+<h1 class="page-title {{ side }}">{{ "דיווח על חיה שנעלמה" if side == "lost" else "דיווח על חיה שנמצאה" }}</h1>
+
+{% if from_screenshot %}
+<div class="note">
+  <p>מילאנו את הפרטים מצילום המסך. בדקו שהכל נכון לפני הפרסום.</p>
+  {% if wanted_photo %}<p>בפוסט הייתה תמונה של החיה. שמרו אותה מהפוסט והעלו אותה כאן, כדי שנוכל להשוות לפי מראה.</p>{% endif %}
+</div>
+{% endif %}
+
+{% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+
+<form method="post" action="/report/{{ side }}" enctype="multipart/form-data" class="report">
+  <input type="hidden" name="source" value="{{ form.source or 'form' }}">
+
+  <fieldset>
+    <legend>תמונות</legend>
+    <p class="hint">תמונה ברורה של הפנים עוזרת הכי הרבה. אפשר עד 5 תמונות.</p>
+    <label class="file-button">
+      <input type="file" name="photos" accept="image/*" multiple id="photos">
+      <span>בחירת תמונות</span>
+    </label>
+    <span class="file-count" id="photo-count" aria-live="polite">לא נבחרו תמונות</span>
+  </fieldset>
+
+  <fieldset>
+    <legend>{{ "איפה ראיתם אותה לאחרונה?" if side == "lost" else "איפה מצאתם אותה?" }}</legend>
+    <p class="hint">לחצו על המפה במקום המדויק, או כתבו עיר ושכונה.</p>
+    <div id="map" class="map"></div>
+    <button type="button" class="link-button" id="locate">המיקום הנוכחי שלי</button>
+    <input type="hidden" name="lat" id="lat" value="{{ form.lat or '' }}">
+    <input type="hidden" name="lon" id="lon" value="{{ form.lon or '' }}">
+    <label for="area_text">עיר ושכונה</label>
+    <input type="text" id="area_text" name="area_text" value="{{ form.area_text or '' }}" placeholder="רמת גן, ליד הפארק הלאומי">
+  </fieldset>
+
+  <fieldset>
+    <legend>מתי?</legend>
+    <label for="event_date">{{ "התאריך שבו נעלמה" if side == "lost" else "התאריך שבו נמצאה" }}</label>
+    <input type="date" id="event_date" name="event_date" required max="{{ today() }}" value="{{ form.event_date or today() }}">
+  </fieldset>
+
+  <fieldset>
+    <legend>איך היא נראית?</legend>
+    <div class="choices" role="radiogroup" aria-label="סוג החיה">
+      {% for key, label in SPECIES_HE.items() %}
+      <label class="choice"><input type="radio" name="species" value="{{ key }}" {% if (form.species or 'dog') == key %}checked{% endif %}> {{ label }}</label>
+      {% endfor %}
+    </div>
+    <p class="hint">צבעים: חובה רק כשאין תמונה.</p>
+    <div class="swatches">
+      {% for c in COLORS %}
+      <label class="swatch">
+        <input type="checkbox" name="colors" value="{{ c }}" {% if c in (form.colors or []) %}checked{% endif %}>
+        <span class="chip" style="background: {{ SWATCHES[c] }}"></span>{{ HE_COLORS[c] }}
+      </label>
+      {% endfor %}
+    </div>
+    {% if side == "lost" %}
+    <label for="pet_name">שם החיה</label>
+    <input type="text" id="pet_name" name="pet_name" value="{{ form.pet_name or '' }}">
+    {% endif %}
+  </fieldset>
+
+  <fieldset>
+    <legend>איך ליצור איתכם קשר?</legend>
+    <p class="hint">
+      {% if side == "lost" %}נשלח לכם מייל כשמישהו ידווח על חיה דומה. הפרטים שלכם לא מוצגים לאף אחד.
+      {% else %}הפרטים שלכם יוצגו רק לבעלים של חיה שמתאימה לדיווח.{% endif %}
+    </p>
+    <label for="contact_name">שם</label>
+    <input type="text" id="contact_name" name="contact_name" value="{{ form.contact_name or '' }}" autocomplete="name">
+    <label for="contact_phone">טלפון</label>
+    <input type="tel" id="contact_phone" name="contact_phone" value="{{ form.contact_phone or '' }}" autocomplete="tel" dir="ltr">
+    <label for="contact_email">אימייל</label>
+    <input type="email" id="contact_email" name="contact_email" value="{{ form.contact_email or '' }}" autocomplete="email" dir="ltr">
+  </fieldset>
+
+  <button type="submit" class="primary {{ side }}">פרסום הדיווח וחיפוש התאמות</button>
+</form>
+{% endblock %}
+{% block scripts %}
+<script src="/static/leaflet/leaflet.js"></script>
+<script>
+document.getElementById('photos').addEventListener('change', function () {
+  var n = this.files.length;
+  document.getElementById('photo-count').textContent =
+    n === 0 ? 'לא נבחרו תמונות' : n === 1 ? 'נבחרה תמונה אחת' : 'נבחרו ' + n + ' תמונות';
+});
+(function () {
+  var lat = document.getElementById('lat'), lon = document.getElementById('lon');
+  if (!window.L) { document.getElementById('map').hidden = true; return; }  // map offline: text still works
+  var start = lat.value ? [+lat.value, +lon.value] : [31.95, 34.85];
+  var map = L.map('map').setView(start, lat.value ? 15 : 8);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '&copy; OpenStreetMap'
+  }).addTo(map);
+  var pin = lat.value ? L.marker(start).addTo(map) : null;
+  function place(ll) {
+    lat.value = ll.lat.toFixed(5); lon.value = ll.lng.toFixed(5);
+    if (pin) pin.setLatLng(ll); else pin = L.marker(ll).addTo(map);
+  }
+  map.on('click', function (e) { place(e.latlng); });
+  document.getElementById('locate').addEventListener('click', function () {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(function (p) {
+      var ll = L.latLng(p.coords.latitude, p.coords.longitude);
+      place(ll); map.setView(ll, 16);
+    });
+  });
+})();
+</script>
+{% endblock %}

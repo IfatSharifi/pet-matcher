@@ -1,4 +1,26 @@
-# Lost & Found Pet Matcher - matching core (Days 1-2)
+# חוזרים הביתה - Lost & Found Pet Matcher
+
+A Hebrew-first web app that matches lost-pet reports with found-pet reports. A finder uploads a photo; the app compares it with every open lost report by appearance (DINOv2), place and date, explains each match in Hebrew, and emails the owner when the match is strong. People can also upload a screenshot of a Facebook/WhatsApp group post, and Claude fills in the report.
+
+Every step is measured: image models, Claude's extraction, and the final ranking each have an eval with logged results below.
+
+**Try it in 3 commands** (after the one-time setup further down):
+
+```powershell
+python scripts\fetch_dogfacenet.py                 # 8,363 dog photos, ~3 min
+python scripts\seed_demo.py --dogs 300 --db demo.db  # 300 lost-dog reports, no API calls
+$env:PETMATCH_DB = "demo.db"; uvicorn app:app      # open http://localhost:8000
+```
+
+Report one of the photos listed in `demo.db.found.txt` as found, near the place listed next to it, and the right dog comes out on top.
+
+<p>
+<img src="docs/screenshots/home.png" width="260" alt="Home page">
+<img src="docs/screenshots/matches.png" width="260" alt="Matches for a found dog">
+<img src="docs/screenshots/screenshot-import.png" width="260" alt="Report prefilled from a screenshot">
+</p>
+
+## Days 1-2: which image model?
 
 Answers one question with numbers: **when someone reports a found pet, does the real owner's pet show up in the top 5?**
 
@@ -119,6 +141,35 @@ Reproduce (no API calls; descriptions are in `eval\dogfacenet_descriptions.jsonl
 python run_ranking_eval.py
 ```
 
+## Days 7-8: the app
+
+FastAPI + Jinja2 pages in Hebrew (right-to-left, mobile first), SQLite storage, email alerts.
+
+| Page | What it does |
+| --- | --- |
+| `/` | Choose "איבדתי" or "מצאתי" |
+| `/report/lost`, `/report/found` | Photos, map pin or city, date, colors, contact |
+| `/import` | Screenshot of a group post -> prefilled report form to check and publish |
+| `/matches/<id>?t=<token>` | The reporter's private page: top 5 candidates with Hebrew reasons |
+| `/api/docs` | JSON API (create report, matches, mark reunited, read screenshot) |
+
+**Design decisions worth knowing:**
+
+- **Two weight sets.** Reports with photos rank by image + place + date; photo-less reports by colors + place + date (see Days 5-6).
+- **Alerts only when precise.** An email goes out only for a photo match scoring at least 0.65, the strict end of the 99%-precision range measured in `run_ranking_eval.py`. Photo-less matches never reached 95% precision, so they never trigger email; they still appear on the matches page. Known trade-off: a pet found long after it was lost (say 30+ days) still ranks first but scores below the alert line. Recalibrate on real data.
+- **Privacy.**
+  - Each report gets a private link (a secret token); without it, the matches page and API return 404.
+  - Owners see finders' contact details; finders never see owners'. That blocks the "I found your dog, pay for delivery" scam.
+  - Public views show place rounded to about 1 km and no contact details.
+  - Uploaded photos are re-encoded, which strips EXIF metadata, including the GPS position phones embed.
+  - Uploaded screenshots are deleted right after reading; only fields the user confirms are saved.
+- **Self-hosted fonts and map library** (`static/`): no requests to Google Fonts or a CDN. Map tiles come from OpenStreetMap.
+- **Service layer first.** `petmatch/service.py` holds all logic and is framework-free; `app.py` is a thin layer, so swapping SQLite for Postgres + pgvector touches only `petmatch/store.py`.
+
+**Verified end to end** (headless Chromium against the demo database): a finder's photo of a seeded dog ranked that dog first and triggered the owner email; the post_006 screenshot (phone displayed reversed) imported with the correct phone, area and date.
+
+**Environment variables:** `ANTHROPIC_API_KEY` (photo descriptions + screenshot import; optional), `RESEND_API_KEY` (real email; without it emails print to the console), `PETMATCH_DB`, `PETMATCH_UPLOADS`, `PETMATCH_EMBEDDER` (`dinov2` or `histogram`), `PETMATCH_BASE_URL` (for email links).
+
 ## Setup on Windows (one time)
 
 1. Install **Python 3.12** from python.org and tick "Add python.exe to PATH".
@@ -194,6 +245,12 @@ petmatch\extract.py     the prompts: describe_pet, read_screenshot
 petmatch\scoring.py     field accuracy and description consistency
 petmatch\ranking.py     combined ranking, weight tuning, Hebrew match reasons
 petmatch\simulate.py    simulated places and dates (assumptions as parameters)
+petmatch\service.py     the app's logic: reports, matches, screenshot drafts, alerts (no web code)
+petmatch\store.py       SQLite storage; the only file to change for Postgres + pgvector
+petmatch\notify.py      email alerts (console or Resend) and the Hebrew email
+app.py                  FastAPI pages + JSON API
+templates\, static\     Hebrew RTL pages, CSS, self-hosted fonts and Leaflet
+scripts\seed_demo.py    demo database of lost dogs (no API calls)
 run_ranking_eval.py     ranking eval: ablations x scenarios
 scripts\describe_reports.py  Claude descriptions for every lost and found report
 run_benchmark.py        image-matching benchmark CLI

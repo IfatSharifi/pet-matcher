@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}צילום מסך של פוסט | חוזרים הביתה{% endblock %}
+{% block main %}
+<h1 class="page-title">דיווח מצילום מסך</h1>
+<p>ראיתם פוסט על חיה שנעלמה או נמצאה? העלו צילום מסך שלו. נקרא את הפרטים ונמלא בשבילכם את טופס הדיווח, ואתם תבדקו לפני הפרסום.</p>
+{% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+<form method="post" action="/import" enctype="multipart/form-data" class="report">
+  <fieldset>
+    <legend>צילום המסך</legend>
+    <input type="file" name="screenshot" accept="image/*" required>
+    <p class="hint">צילום המסך לא נשמר אצלנו. שומרים רק את הפרטים שתאשרו.</p>
+  </fieldset>
+  <button type="submit" class="primary">קריאת הפוסט</button>
+</form>
+{% endblock %}

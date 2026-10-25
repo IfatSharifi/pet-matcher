@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block main %}
+<section class="board" aria-label="בחירת סוג דיווח">
+  <a class="flyer lost" href="/report/lost">
+    <span class="flyer-word">איבדתי</span>
+    <span class="flyer-text">ספרו לנו איך החיה נראית ואיפה ראיתם אותה לאחרונה. נראה לכם מי מצא חיה דומה בסביבה.</span>
+    <span class="tabs" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span>
+    <span class="flyer-cta">דיווח על חיה שנעלמה</span>
+  </a>
+  <a class="flyer found" href="/report/found">
+    <span class="flyer-word">מצאתי</span>
+    <span class="flyer-text">צלמו את החיה וסמנו איפה מצאתם אותה. נבדוק מי מחפש אותה ונעביר לבעלים את הפרטים שלכם.</span>
+    <span class="tabs" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span>
+    <span class="flyer-cta">דיווח על חיה שנמצאה</span>
+  </a>
+</section>
+<p class="screenshot-hint">
+  ראיתם פוסט בקבוצת אבודים ונמצאים? <a href="/import">העלו צילום מסך</a> ונמלא את הפרטים בשבילכם.
+</p>
+{% endblock %}

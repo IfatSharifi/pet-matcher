@@ -32,9 +32,11 @@ class Embedder:
             vecs = self._embed_batch([_open_rgb(p) for p in chunk]).astype(np.float32)
             for p, v in zip(chunk, vecs):
                 cache[self._key(p)] = v
-            print(f"  {self.name}: {min(i + batch_size, len(todo))}/{len(todo)} new images", end="\r")
+            if len(todo) > batch_size:  # progress only for bulk runs, not one upload at a time
+                print(f"  {self.name}: {min(i + batch_size, len(todo))}/{len(todo)} new images", end="\r")
         if todo:
-            print()
+            if len(todo) > batch_size:
+                print()
             self._save_cache(cache)
         return np.stack([cache[k] for k in keys])
 

@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}התאמות | חוזרים הביתה{% endblock %}
+{% block main %}
+{% if new %}
+<div class="note">
+  <p><strong>הדיווח פורסם.</strong> זה הקישור הפרטי שלכם לעמוד הזה: שמרו אותו, ואל תשתפו אותו.</p>
+</div>
+{% endif %}
+
+{% if me.side == "lost" %}
+<h1 class="page-title lost">התאמות אפשריות ל{{ me.pet_name or "חיה שלכם" }}</h1>
+{% else %}
+<h1 class="page-title found">מי מחפש את החיה שמצאתם?</h1>
+<p class="hint">אלה דיווחים על חיות שנעלמו ודומות לחיה שמצאתם. הבעלים רואים את פרטי הקשר שלכם בעמוד ההתאמות שלהם, ומקבלים מייל כשההתאמה חזקה.</p>
+{% endif %}
+
+{% if me.status != "open" %}
+<p class="note">הדיווח הזה סגור ולא מופיע יותר בחיפושים.</p>
+{% elif not matches %}
+<p class="empty">
+  {% if me.side == "lost" %}עדיין אין דיווחים שמתאימים. ברגע שמישהו ידווח על חיה דומה, היא תופיע כאן{% if me.contact_email %} ונשלח לכם מייל{% endif %}.
+  {% else %}עדיין אין דיווח על חיה שנעלמה שמתאים. הבעלים יראו את הדיווח שלכם ברגע שידווחו.{% endif %}
+  בינתיים, שווה לשתף את הדיווח גם בקבוצות האזוריות.
+</p>
+{% else %}
+<ol class="matches">
+  {% for m in matches %}
+  {% set o = m.report %}
+  <li class="match{% if m.used_photos and m.score >= ALERT_THRESHOLD %} strong{% endif %}">
+    {% if o.has_photo %}
+    <img class="thumb" src="/photos/{{ o.id }}/0" alt="תמונה מהדיווח" loading="lazy">
+    {% else %}
+    <div class="thumb none" aria-hidden="true">
+      {% for c in o.colors %}<span style="background: {{ SWATCHES[c] }}"></span>{% endfor %}
+    </div>
+    {% endif %}
+    <div class="match-body">
+      {% if m.used_photos and m.score >= ALERT_THRESHOLD %}<p class="badge">התאמה חזקה</p>{% endif %}
+      <h2>{{ SPECIES_HE.get(o.species, "חיה") }}{% if o.colors %} {{ o.colors | he_colors }}{% endif %}{% if o.pet_name %}, {{ o.pet_name }}{% endif %}</h2>
+      <p class="where">{{ o.area_text or "אזור לא צוין" }}, {{ "נעלמה" if o.side == "lost" else "נמצאה" }} ב-{{ o.event_date.strftime("%d.%m.%Y") }}</p>
+      <ul class="reasons">
+        {% for part in m.reason.split(" · ") %}<li>{{ part }}</li>{% endfor %}
+      </ul>
+      {% if me.side == "lost" %}
+      <div class="tear">
+        <p class="tear-label">פרטי המוצא/ת</p>
+        <p>
+          {% if o.contact_name %}{{ o.contact_name }}{% endif %}
+          {% if o.contact_phone %}<a href="tel:{{ o.contact_phone }}" dir="ltr">{{ o.contact_phone }}</a>{% endif %}
+          {% if o.contact_email %}<a href="mailto:{{ o.contact_email }}" dir="ltr">{{ o.contact_email }}</a>{% endif %}
+        </p>
+      </div>
+      <form method="post" action="/matches/{{ me.id }}/reunited?t={{ token }}">
+        <input type="hidden" name="other_id" value="{{ o.id }}">
+        <button type="submit" class="secondary">זו החיה שלי, היא חזרה הביתה</button>
+      </form>
+      {% endif %}
+    </div>
+  </li>
+  {% endfor %}
+</ol>
+{% endif %}
+
+{% if me.side == "found" and me.status == "open" %}
+<form method="post" action="/matches/{{ me.id }}/reunited?t={{ token }}" class="close-report">
+  <p>החיה כבר אצל הבעלים? סגרו את הדיווח כדי שלא יופיע יותר בחיפושים.</p>
+  <button type="submit" class="secondary">החיה חזרה לבעלים</button>
+</form>
+{% endif %}
+{% endblock %}
