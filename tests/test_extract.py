@@ -32,6 +32,17 @@ GOOD = {"report_type": "lost", "species": "dog", "pet_name": "לוסי", "primar
         "description_he": "כלבה שחורה לבנה", "has_pet_photo": False}
 
 
+class TestPhoneFix(unittest.TestCase):
+    def test_reversed_groups_are_restored(self):
+        from petmatch.extract import fix_phone
+        self.assertEqual(fix_phone("4552555058"), "0585554552")   # seen in the Haiku v1 run
+        self.assertEqual(fix_phone("4552 555 058"), "0585554552")
+        self.assertEqual(fix_phone("058-555-4552"), "0585554552")  # already right: untouched
+        self.assertEqual(fix_phone("+972 58-555-4552"), "0585554552")
+        self.assertEqual(fix_phone("1234567890"), "1234567890")    # not a reversed mobile: untouched
+        self.assertIsNone(fix_phone(None))
+
+
 class TestSchemas(unittest.TestCase):
     def test_schemas_follow_api_rules(self):
         self.assertEqual(check_schema(PET_DESCRIPTION_SCHEMA), [])
@@ -110,7 +121,7 @@ class TestClient(unittest.TestCase):
         client = ClaudeClient(model="claude-haiku-5-5", api_key="test")
         client._post = FakeAPI(GOOD)
         out = read_screenshot(client, self.img)
-        self.assertEqual(out, GOOD)
+        self.assertEqual(out, {**GOOD, "contact_phone": "0505551234"})  # phone normalized
         body = client._post.bodies[0]
         self.assertEqual(body["output_config"]["format"]["type"], "json_schema")
         self.assertIs(body["output_config"]["format"]["schema"], SCREENSHOT_SCHEMA)

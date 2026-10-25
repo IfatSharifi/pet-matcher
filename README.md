@@ -46,6 +46,34 @@ python eval_extraction.py screenshots --model claude-sonnet-5-5   # compare
 
 Outputs: `results\extraction_log.csv` (accuracy per field, cost, latency per run) and `results\screenshot_errors_<model>.csv` (every wrong field, truth vs. prediction; opens in Excel with Hebrew intact). Expected cost for both evals on Haiku 5.5: a few cents.
 
+### Results (Oct 25, 2026)
+
+**Screenshots** - 40 Hebrew posts; "all fields" = every scored field right:
+
+| Run | all fields | phone | date | area | colors | cost / 40 posts |
+| --- | --- | --- | --- | --- | --- | --- |
+| Haiku 5.5, prompt v1 | 82.5% | 92.5% | 97.5% | 97.5% | 92.0% | $0.018 |
+| **Haiku 5.5, prompt v2** | **92.5%** | **100%** | **97.5%** | **100%** | **92.0%** | **$0.020** |
+| Sonnet 5.5, prompt v2 | 62.5% | 100% | 77.5% | 95.0% | 88.0% | $0.232 |
+
+Report type, species and has-photo were 100% in every run.
+
+- **v1 -> v2:** 3 of 7 v1 errors were phone numbers read backwards. In right-to-left text, "058 555 4552" is *displayed* as "4552 555 058" - the same thing happens in real Hebrew posts. v2 tells Claude about it, and `fix_phone()` repairs any that slip through. v2 also covers sighting dates and drops "באזור" from areas.
+- **Haiku beats Sonnet here, at 1/12 the cost.** Sonnet mis-resolved Hebrew relative dates (שלשום, הערב, "ב-1.10"), "corrected" name spellings (גינגר -> ג'ינג'ר) and once took a neighborhood as the pet's name. Decision: Haiku 5.5.
+- **Remaining Haiku misses:** one sighting dated null despite "אתמול", one gray cat with no color, one "חום בהיר" read as brown instead of tan.
+
+**Pet descriptions** - Haiku 5.5, 30 dogs x 3 photos, $0.028:
+
+| Field | Same answer across photos of one dog |
+| --- | --- |
+| species | 100% |
+| main color | 92.2% |
+| color set (Jaccard) | 73.6% |
+| collar | 73.3% |
+| size | 93.3% |
+
+Size is "unknown" for 87 of 90 photos, correctly: DogFaceNet shows faces only, so that score says little yet. Collar disagrees because it is visible in some photos and not others, so collar must never be a hard filter in matching.
+
 The **describe** eval needs no labels: it measures whether different photos of the same dog get the same species, size, main color and color set. A description that changes between photos can't help match a lost report to a found one.
 
 ## Setup on Windows (one time)

@@ -1,0 +1,18 @@
+﻿file,field,truth,predicted
+post_002.jpg,event_date,"""2026-10-17""","""2026-10-19"""
+post_006.jpg,event_date,"""2026-10-24""","""2026-10-23"""
+post_008.jpg,colors,"[""gray""]",[]
+post_010.jpg,area,"""רחובות, רחוב הרצל""","""רחוב הרצל"""
+post_011.jpg,event_date,"""2026-10-01""","""2026-10-07"""
+post_015.jpg,event_date,"""2026-10-24""","""2026-10-23"""
+post_018.jpg,event_date,"""2026-10-23""","""2026-10-25"""
+post_020.jpg,area,"""רחובות, רחוב הרצל""","""רחוב הרצל"""
+post_020.jpg,event_date,"""2026-10-18""","""2026-10-17"""
+post_023.jpg,event_date,"""2026-10-03""","""2026-10-02"""
+post_026.jpg,event_date,"""2026-09-30""","""2026-10-02"""
+post_030.jpg,pet_name,"""גינגר""","""ג'ינג'ר"""
+post_030.jpg,colors,"[""brown""]",[]
+post_031.jpg,event_date,"""2026-10-22""","""2026-10-24"""
+post_034.jpg,colors,"[""tan""]","[""brown""]"
+post_035.jpg,pet_name,null,"""מוריה"""
+post_036.jpg,pet_name,"""צ'ארלי""","""צ'רלי"""

@@ -1,0 +1,8 @@
+﻿file,field,truth,predicted
+post_006.jpg,contact_phone,"""0585554552""","""4552555058"""
+post_007.jpg,contact_phone,"""0535550067""","""0067555053"""
+post_010.jpg,event_date,"""2026-10-03""",null
+post_020.jpg,colors,"[""gray""]",[]
+post_021.jpg,area,"""באר שבע, שכונה ד'""","""אזור בר שבע, שכונה ד'"""
+post_034.jpg,colors,"[""tan""]","[""brown""]"
+post_039.jpg,contact_phone,"""0545559079""","""9079555054"""

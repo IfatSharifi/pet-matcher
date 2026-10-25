@@ -1,0 +1,4 @@
+﻿file,field,truth,predicted
+post_010.jpg,event_date,"""2026-10-03""",null
+post_020.jpg,colors,"[""gray""]",[]
+post_034.jpg,colors,"[""tan""]","[""brown""]"
