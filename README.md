@@ -26,6 +26,28 @@ DINOv2 embeds about 26 photos/second on a 2-core CPU, so a single new report tak
 
 **Caveat:** DogFaceNet photos are cropped, aligned faces. Real lost-pet photos show the whole body from any angle, so expect lower numbers until a face/body detection step and a real-world test set are added.
 
+## Days 3-4: Claude vision extraction
+
+Two jobs, each with a JSON schema Claude must fill (structured outputs, so no parsing guesswork):
+
+- **Describe a pet** from photos: species, breed guess, size, 1-3 colors from a fixed vocabulary, distinctive markings, collar, photo quality.
+- **Read a screenshot** of a Hebrew lost/found post into a draft report: lost / found / sighting, species, name, colors, area (Hebrew as written), date (relative dates resolved from the post date), phone (digits only), whether the post has a pet photo.
+
+**Eval set:** `eval\screenshots` holds 40 synthetic Hebrew group posts with an answer key (`labels.jsonl`): 24 lost, 12 found, 4 sightings; 27 dogs, 13 cats; 15 with a DogFaceNet photo; 8 with no phone; dates written as "today", "yesterday", "שלשום" or an explicit date. Synthetic on purpose: real screenshots contain real people's phone numbers. Regenerate or enlarge with `python scripts\make_screenshots.py --n 100`.
+
+**Run it** (needs a Claude API key; responses are cached, so re-runs are free):
+
+```powershell
+$env:ANTHROPIC_API_KEY = "sk-ant-..."
+python eval_extraction.py screenshots                      # field accuracy, Haiku 5.5
+python eval_extraction.py describe --dogs 30               # do 3 photos of one dog get the same description?
+python eval_extraction.py screenshots --model claude-sonnet-5-5   # compare
+```
+
+Outputs: `results\extraction_log.csv` (accuracy per field, cost, latency per run) and `results\screenshot_errors_<model>.csv` (every wrong field, truth vs. prediction; opens in Excel with Hebrew intact). Expected cost for both evals on Haiku 5.5: a few cents.
+
+The **describe** eval needs no labels: it measures whether different photos of the same dog get the same species, size, main color and color set. A description that changes between photos can't help match a lost report to a found one.
+
 ## Setup on Windows (one time)
 
 1. Install **Python 3.12** from python.org and tick "Add python.exe to PATH".
@@ -95,7 +117,14 @@ petmatch\data.py        load folders or CSV, make the query/gallery split
 petmatch\embedders.py   histogram, CLIP and DINOv2 embedders + disk cache
 petmatch\index.py       in-memory cosine vector index (pgvector replaces it in the API phase)
 petmatch\metrics.py     recall@k, MRR, de-duplicated ranks
-run_benchmark.py        the CLI
+petmatch\schemas.py     JSON schemas Claude fills + checks against the API's schema rules
+petmatch\claude_client.py   Claude API client: structured outputs, retries, cache, cost tracking
+petmatch\extract.py     the prompts: describe_pet, read_screenshot
+petmatch\scoring.py     field accuracy and description consistency
+run_benchmark.py        image-matching benchmark CLI
+eval_extraction.py      Claude extraction eval CLI
+eval\screenshots\       40 synthetic Hebrew posts + answer key
 scripts\fetch_dogfacenet.py  downloads the DogFaceNet benchmark
-tests\test_core.py      tests that run without any model download
+scripts\make_screenshots.py  generates the synthetic Hebrew posts
+tests\                  23 tests; no model download or API key needed
 ```
