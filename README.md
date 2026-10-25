@@ -35,7 +35,7 @@ Two jobs, each with a JSON schema Claude must fill (structured outputs, so no pa
 
 **Eval set:** `eval\screenshots` holds 40 synthetic Hebrew group posts with an answer key (`labels.jsonl`): 24 lost, 12 found, 4 sightings; 27 dogs, 13 cats; 15 with a DogFaceNet photo; 8 with no phone; dates written as "today", "yesterday", "שלשום" or an explicit date. Synthetic on purpose: real screenshots contain real people's phone numbers. Regenerate or enlarge with `python scripts\make_screenshots.py --n 100`.
 
-**Run it** (needs a Claude API key; responses are cached, so re-runs are free):
+**Run it** (needs a Claude API key from [platform.claude.com/settings/keys](https://platform.claude.com/settings/keys); scope it to a workspace when you create it, or also set `$env:ANTHROPIC_WORKSPACE_ID`. Responses are cached, so re-runs are free):
 
 ```powershell
 $env:ANTHROPIC_API_KEY = "sk-ant-..."

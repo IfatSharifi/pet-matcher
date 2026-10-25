@@ -7,6 +7,7 @@ Standard library only (no SDK needed), with:
   - token and cost accounting
 
 Set your key first:  $env:ANTHROPIC_API_KEY = "sk-ant-..."   (PowerShell)
+If the key was created without a workspace, also set $env:ANTHROPIC_WORKSPACE_ID = "wrkspc_...".
 """
 from __future__ import annotations
 
@@ -138,6 +139,10 @@ class ClaudeClient:
         data = json.dumps(body).encode()
         headers = {"x-api-key": self.api_key, "anthropic-version": API_VERSION,
                    "content-type": "application/json"}
+        # Keys not scoped to a workspace must name one on every request.
+        workspace = os.environ.get("ANTHROPIC_WORKSPACE_ID")
+        if workspace:
+            headers["anthropic-workspace-id"] = workspace
         for attempt in range(self.max_retries + 1):
             req = urllib.request.Request(API_URL, data=data, headers=headers, method="POST")
             try:
