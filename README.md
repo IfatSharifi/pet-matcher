@@ -76,6 +76,49 @@ Size is "unknown" for 87 of 90 photos, correctly: DogFaceNet shows faces only, s
 
 The **describe** eval needs no labels: it measures whether different photos of the same dog get the same species, size, main color and color set. A description that changes between photos can't help match a lost report to a found one.
 
+## Days 5-6: combined ranking
+
+`petmatch\ranking.py` scores every (found report, lost report) pair:
+
+- **image**: DINOv2 cosine of the best-matching photo pair
+- **colors**: soft overlap of Claude's color lists (tan vs brown counts half)
+- **place**: `-log(1 + km apart)`; **date**: `-log(1 + days between lost and found)`
+- **hard rules**: exclude a clear dog-vs-cat conflict, or a pet "found" more than a day before it was lost
+
+Weights are tuned on half the dogs and tested on the other half. Every match gets a Hebrew reason line, e.g. `פנים דומות מאוד · אותו צבע: שחור · 600 מטר מהמקום שבו אבד · נמצא יומיים אחרי` (see `results\ranking_examples.md`).
+
+**Places and dates are simulated** (`petmatch\simulate.py`): DogFaceNet has none. Lost reports are spread over 15 Israeli cities by population, and each found report is placed and dated relative to its lost one. To show how much the result leans on those assumptions, three scenarios:
+
+| Scenario | Assumption |
+| --- | --- |
+| base | found ~1.5 km away (10% far), ~3 days later |
+| wander | found ~5 km away (25% far), ~7 days later |
+| dense | as base, but reports packed into 30 days and tighter neighborhoods |
+
+**Results** - 697 test dogs against all 1,393 lost reports (recall@1 / recall@5):
+
+| Ranking | base | wander | dense |
+| --- | --- | --- | --- |
+| image only | 85.9% / 94.5% | 85.9% / 94.5% | 85.9% / 94.5% |
+| + colors | 86.2% / 94.7% | 86.2% / 94.7% | 86.2% / 94.7% |
+| **+ place & date** | **98.4% / 99.7%** | **95.7% / 98.9%** | **95.8% / 99.4%** |
+| all | 98.0% / 99.7% | 95.6% / 98.9% | 95.6% / 99.3% |
+| no photo: place & date | 30.8% / 64.7% | 7.6% / 27.7% | 9.2% / 33.6% |
+| **no photo: + colors** | **54.8% / 81.2%** | **29.7% / 59.5%** | **30.7% / 67.6%** |
+
+What this says:
+
+- **Place and date are the big lever.** Top-1 rises from 86% to 96-98% in every scenario. In 'base', 84 of 98 image-only misses are fixed, including 43 of the 48 black dogs, and none of image-only's hits break.
+- **With a photo, colors add nothing**: DINOv2 already sees color. **Without a photo** (a text-only post, 25 of 40 in our screenshot set) colors are the only appearance signal and raise top-5 from 65% to 81% in 'base'. So the app uses two weight sets: photo -> image + place + date; no photo -> colors + place + date.
+- The no-photo numbers are optimistic: these colors came from Claude looking at photos, while a text post's colors come from the poster's words.
+- **Bug found by the eval:** Haiku labeled a wolf-like dog's species "other", and a strict species rule excluded every candidate for it. Now only a clear dog-vs-cat conflict excludes.
+
+Reproduce (no API calls; descriptions are in `eval\dogfacenet_descriptions.jsonl`, which cost $0.93 on Haiku 5.5):
+
+```powershell
+python run_ranking_eval.py
+```
+
 ## Setup on Windows (one time)
 
 1. Install **Python 3.12** from python.org and tick "Add python.exe to PATH".
@@ -149,10 +192,14 @@ petmatch\schemas.py     JSON schemas Claude fills + checks against the API's sch
 petmatch\claude_client.py   Claude API client: structured outputs, retries, cache, cost tracking
 petmatch\extract.py     the prompts: describe_pet, read_screenshot
 petmatch\scoring.py     field accuracy and description consistency
+petmatch\ranking.py     combined ranking, weight tuning, Hebrew match reasons
+petmatch\simulate.py    simulated places and dates (assumptions as parameters)
+run_ranking_eval.py     ranking eval: ablations x scenarios
+scripts\describe_reports.py  Claude descriptions for every lost and found report
 run_benchmark.py        image-matching benchmark CLI
 eval_extraction.py      Claude extraction eval CLI
 eval\screenshots\       40 synthetic Hebrew posts + answer key
 scripts\fetch_dogfacenet.py  downloads the DogFaceNet benchmark
 scripts\make_screenshots.py  generates the synthetic Hebrew posts
-tests\                  23 tests; no model download or API key needed
+tests\                  tests; no model download or API key needed
 ```
