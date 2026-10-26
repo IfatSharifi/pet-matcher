@@ -106,6 +106,8 @@ document.getElementById('photos').addEventListener('change', function () {
     if (pin) pin.setLatLng(ll); else pin = L.marker(ll).addTo(map);
   }
   map.on('click', function (e) { place(e.latlng); });
+  // same as a tap on the map; used by scripts/record_demo.py
+  window.setPin = function (la, lo) { var ll = L.latLng(la, lo); place(ll); map.setView(ll, 15); };
   document.getElementById('locate').addEventListener('click', function () {
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(function (p) {

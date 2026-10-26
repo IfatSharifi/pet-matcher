@@ -4,6 +4,8 @@ A Hebrew-first web app that matches lost-pet reports with found-pet reports. A f
 
 Every step is measured: image models, Claude's extraction, and the final ranking each have an eval with logged results below.
 
+**Demo video:** [`docs/demo.mp4`](docs/demo.mp4) (68 s, phone format, captioned). Voiceover script: [`docs/demo-script.md`](docs/demo-script.md).
+
 **Try it in 3 commands** (after the one-time setup further down):
 
 ```powershell
@@ -170,14 +172,39 @@ FastAPI + Jinja2 pages in Hebrew (right-to-left, mobile first), SQLite storage, 
 
 **Environment variables:** `ANTHROPIC_API_KEY` (photo descriptions + screenshot import; optional), `RESEND_API_KEY` (real email; without it emails print to the console), `PETMATCH_DB`, `PETMATCH_UPLOADS`, `PETMATCH_EMBEDDER` (`dinov2` or `histogram`), `PETMATCH_BASE_URL` (for email links).
 
+## Days 9-10: deploy to Render
+
+`render.yaml` describes the whole service, so deploying is a few clicks:
+
+1. Push this folder to a GitHub repository (a fresh repo; `.gitignore` already keeps data, databases and keys out).
+2. In the [Render dashboard](https://dashboard.render.com): **New > Blueprint**, pick the repository.
+3. When Render asks for `ANTHROPIC_API_KEY`, paste a key created only for this server (Claude Console, in a workspace with a monthly spend limit). Never put a key in the repository or a chat.
+4. Click **Apply**. The first build takes about 5-8 minutes: CPU-only PyTorch, the DINOv2 model, and a demo database of 300 DogFaceNet dogs. The site then lives at `https://pet-matcher-xxxx.onrender.com`.
+
+What the blueprint sets up:
+
+| Setting | Value | Why |
+| --- | --- | --- |
+| Plan | `1c-2g`: 1 CPU, 2 GB, $25/month, billed per second | The app peaks around 0.9 GB with DINOv2 loaded; the free 512 MB tier is too small, and only paid plans get a disk |
+| Disk | 1 GB at `var/`, $0.25/month | Reports and uploaded photos survive deploys and restarts; Render snapshots it daily |
+| Region | Frankfurt | Closest to Israel |
+| Claude limits | 20 calls per visitor per hour, 300 per day | A public demo spends your credit; past the limit, reports still save and match by photo |
+| Demo mode | `PETMATCH_DEMO=1` | Banner saying it's a demo; seeds the 300 dogs on first start only |
+
+**Rehearsed before shipping:** `deploy/build.sh` and `deploy/start.sh` were run on a fresh clone exactly as Render runs them, except the CPU-PyTorch download line, which was blocked in the build environment. The server started with no network access to Hugging Face, so the model came from the build. A found-dog request matched the right dog first, and a restart kept all reports without reseeding.
+
+**Not done yet:** real email (add `RESEND_API_KEY`; Resend's test sender only delivers to your own address until you verify a domain), and Postgres if it ever needs more than one server.
+
+**To save money,** suspend the service in Render between demos; billing is per second.
+
 ## Setup on Windows (one time)
 
-1. Install **Python 3.12** from python.org and tick "Add python.exe to PATH".
+1. Install **Python 3.13** from python.org and tick "Add python.exe to PATH".
 2. Unzip this folder, e.g. to `Documents\pet-matcher`, and open PowerShell there.
 3. Create a virtual environment and install packages:
 
 ```powershell
-py -3.12 -m venv .venv
+py -3.13 -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install torch --index-url https://download.pytorch.org/whl/cpu
 pip install -r requirements.txt
@@ -248,9 +275,12 @@ petmatch\simulate.py    simulated places and dates (assumptions as parameters)
 petmatch\service.py     the app's logic: reports, matches, screenshot drafts, alerts (no web code)
 petmatch\store.py       SQLite storage; the only file to change for Postgres + pgvector
 petmatch\notify.py      email alerts (console or Resend) and the Hebrew email
-app.py                  FastAPI pages + JSON API
+app.py                  FastAPI pages + JSON API, rate limit, health check
 templates\, static\     Hebrew RTL pages, CSS, self-hosted fonts and Leaflet
 scripts\seed_demo.py    demo database of lost dogs (no API calls)
+scripts\record_demo.py  records the captioned demo video
+render.yaml, deploy\    Render blueprint, build and start scripts
+docs\                   demo video, voiceover script, screenshots
 run_ranking_eval.py     ranking eval: ablations x scenarios
 scripts\describe_reports.py  Claude descriptions for every lost and found report
 run_benchmark.py        image-matching benchmark CLI
