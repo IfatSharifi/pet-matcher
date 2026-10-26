@@ -1,27 +1,30 @@
 # Render Blueprint: New > Blueprint > pick this repo. https://render.com/docs/blueprint-spec
-# Cost: 1c-2g plan $25/month + 1 GB disk $0.25/month, billed per second while running
-# (suspend the service when you're not demoing it).
+#
+# Free plan: $0. It sleeps after 15 minutes without visitors (the next visit takes about a
+# minute to wake it) and has no persistent disk, so every restart starts again from the
+# 300 demo dogs; reports visitors add are lost then. Fine for a portfolio demo.
+#
+# To keep reports and stay awake: set plan to 0.5c-512mb ($7/month) and uncomment the disk
+# block ($0.25/month). The app needs about 350 MB, so 512 MB is enough either way.
 services:
   - type: web
     name: pet-matcher
     runtime: python
-    plan: 1c-2g                 # 2 GB: the app peaks around 0.9 GB with DINOv2 loaded
+    plan: free
     region: frankfurt           # closest Render region to Israel
     buildCommand: bash deploy/build.sh
     startCommand: bash deploy/start.sh
     healthCheckPath: /health
-    disk:
-      name: data
-      mountPath: /opt/render/project/src/var
-      sizeGB: 1
+    # disk:                     # paid plans only
+    #   name: data
+    #   mountPath: /opt/render/project/src/var
+    #   sizeGB: 1
     envVars:
       - key: ANTHROPIC_API_KEY  # paste a fresh key when Render asks; never commit it
         sync: false
       - key: PETMATCH_DEMO
         value: "1"
-      - key: HF_HOME            # keep the model downloaded at build time
-        value: /opt/render/project/src/.hf_cache
-      - key: OMP_NUM_THREADS    # 1 CPU on this plan
+      - key: ORT_THREADS        # free plan has a fraction of a CPU
         value: "1"
       - key: PETMATCH_CLAUDE_PER_HOUR
         value: "20"

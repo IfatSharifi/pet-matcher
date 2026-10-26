@@ -1,20 +1,17 @@
 #!/usr/bin/env bash
 # Build step (Render runs this; it also works locally on Linux/macOS or Git Bash).
-#   - installs CPU-only PyTorch (no 3 GB of GPU libraries on a CPU server)
-#   - downloads DINOv2 into $HF_HOME so the first request doesn't wait for it
+#   - installs the server requirements only: no PyTorch, DINOv2 runs on ONNX Runtime
+#   - downloads the DINOv2 ONNX model (88 MB) into .models/ so the first request doesn't wait
 #   - with PETMATCH_DEMO=1: fetches 300 DogFaceNet dogs and builds seed/demo.db
 set -euo pipefail
 cd "$(dirname "$0")/.."
 python --version
 
 pip install --upgrade pip
-if [ "${SKIP_TORCH_INSTALL:-0}" != "1" ]; then
-  pip install torch --index-url https://download.pytorch.org/whl/cpu
-fi
 pip install -r requirements.txt
 
 echo "Downloading the DINOv2 model..."
-python -c "from petmatch.embedders import DinoV2Embedder; DinoV2Embedder()"
+python -c "from petmatch.embedders import DinoV2OnnxEmbedder; print(DinoV2OnnxEmbedder.download())"
 
 if [ "${PETMATCH_DEMO:-0}" = "1" ]; then
   echo "Building the demo database..."

@@ -1,6 +1,6 @@
 """The app's core, independent of any web framework.
 
-    svc = MatchService(Store("petmatch.db"), DinoV2Embedder(), ClaudeClient(), ConsoleNotifier())
+    svc = MatchService(Store("petmatch.db"), DinoV2OnnxEmbedder(), ClaudeClient(), ConsoleNotifier())
     rid = svc.create_report("found", photos=[...], event_date=date.today(), lat=32.07, lon=34.82, ...)
     svc.matches(rid)        # ranked candidates with Hebrew reasons
     svc.import_screenshot("post.jpg")   # draft report from a Facebook/WhatsApp screenshot

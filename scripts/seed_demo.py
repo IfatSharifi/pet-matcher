@@ -36,7 +36,7 @@ def main() -> None:
     ap.add_argument("--descriptions", default="eval/dogfacenet_descriptions.jsonl")
     ap.add_argument("--db", default="demo.db")
     ap.add_argument("--dogs", type=int, default=300)
-    ap.add_argument("--embedder", default="dinov2", choices=sorted(EMBEDDERS))
+    ap.add_argument("--embedder", default="dinov2-onnx", choices=sorted(EMBEDDERS))
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
 

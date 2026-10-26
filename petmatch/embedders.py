@@ -6,7 +6,9 @@ Embeddings are cached on disk too, so re-running the benchmark is fast.
 from __future__ import annotations
 
 import hashlib
+import os
 import threading
+import urllib.request
 from pathlib import Path
 
 import numpy as np
@@ -119,6 +121,59 @@ class DinoV2Embedder(Embedder):
         return out.pooler_output.cpu().numpy()
 
 
+class DinoV2OnnxEmbedder(Embedder):
+    """The same DINOv2-small, run with ONNX Runtime instead of PyTorch: no torch or transformers.
+
+    The server uses this one. Peak memory is about 350 MB instead of about 900 MB, which fits
+    a 512 MB host, and the vectors match the PyTorch model (cosine 1.00000 on 200 DogFaceNet
+    photos), so the benchmark results carry over unchanged.
+
+    Model: onnx-community/dinov2-small (an ONNX export of facebook/dinov2-small). It returns the
+    token sequence; the first token is what the PyTorch model calls pooler_output.
+    """
+    name = "dinov2-small-onnx"
+    url = "https://huggingface.co/onnx-community/dinov2-small/resolve/main/onnx/model.onnx"
+    MEAN = np.array([0.485, 0.456, 0.406], np.float32)
+    STD = np.array([0.229, 0.224, 0.225], np.float32)
+
+    def __init__(self, model_dir: str | Path | None = None) -> None:
+        import onnxruntime as ort
+        path = self.download(model_dir)
+        opts = ort.SessionOptions()
+        opts.intra_op_num_threads = int(os.environ.get("ORT_THREADS", "0"))  # 0 = all cores
+        self.session = ort.InferenceSession(str(path), opts, providers=["CPUExecutionProvider"])
+        self.input_name = self.session.get_inputs()[0].name
+
+    @classmethod
+    def download(cls, model_dir: str | Path | None = None) -> Path:
+        """Fetch the model once (88 MB) into PETMATCH_MODELS (default .models/)."""
+        folder = Path(model_dir or os.environ.get("PETMATCH_MODELS", ".models"))
+        path = folder / "dinov2-small.onnx"
+        if not path.exists():
+            folder.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_suffix(".part")
+            urllib.request.urlretrieve(cls.url, tmp)
+            tmp.replace(path)  # never leave a half-downloaded model behind
+        return path
+
+    @classmethod
+    def preprocess(cls, im: Image.Image) -> np.ndarray:
+        """DINOv2's own preprocessing in numpy: shortest side to 256 (bicubic), center 224 crop,
+        scale to 0..1, normalize with ImageNet mean/std, channels first."""
+        w, h = im.size
+        s = 256 / min(w, h)
+        im = im.resize((max(round(w * s), 256), max(round(h * s), 256)), Image.BICUBIC)
+        w, h = im.size
+        left, top = (w - 224) // 2, (h - 224) // 2
+        a = np.asarray(im.crop((left, top, left + 224, top + 224)), np.float32) / 255.0
+        return ((a - cls.MEAN) / cls.STD).transpose(2, 0, 1)
+
+    def _embed_batch(self, images):
+        batch = np.stack([self.preprocess(im) for im in images])
+        tokens = self.session.run(None, {self.input_name: batch})[0]
+        return tokens[:, 0, :]
+
+
 class ColorHistogramEmbedder(Embedder):
     """No-download baseline: a coarse color histogram. Any real model must beat it.
 
@@ -138,6 +193,7 @@ class ColorHistogramEmbedder(Embedder):
 
 EMBEDDERS = {
     "clip": ClipEmbedder,
-    "dinov2": DinoV2Embedder,
+    "dinov2": DinoV2Embedder,          # PyTorch; research and benchmarks
+    "dinov2-onnx": DinoV2OnnxEmbedder,  # same model, no PyTorch; the app's default
     "histogram": ColorHistogramEmbedder,
 }

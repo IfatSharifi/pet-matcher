@@ -9,7 +9,7 @@ Environment:
     RESEND_API_KEY      send real alert emails (optional; without it, emails print to the console)
     PETMATCH_DB         SQLite file (default petmatch.db)
     PETMATCH_UPLOADS    photo folder (default uploads)
-    PETMATCH_EMBEDDER   dinov2 (default) or histogram (fast, no download - for demos and tests)
+    PETMATCH_EMBEDDER   dinov2-onnx (default, no PyTorch), dinov2 (PyTorch), or histogram (tests)
     PETMATCH_BASE_URL   used in email links (default: Render's RENDER_EXTERNAL_URL, else localhost)
     PETMATCH_DEMO       1 = show the "demo site" banner
     PETMATCH_CLAUDE_PER_HOUR / PETMATCH_CLAUDE_PER_DAY   Claude call limits (default 20 per visitor, 300 per day)
@@ -294,7 +294,7 @@ def build_service_from_env() -> MatchService:
     # no response cache on a server: it would keep strangers' screenshot details on disk
     claude = ClaudeClient(use_cache=False) if os.environ.get("ANTHROPIC_API_KEY") else None
     notifier = ResendNotifier() if os.environ.get("RESEND_API_KEY") else ConsoleNotifier()
-    embedder = EMBEDDERS[os.environ.get("PETMATCH_EMBEDDER", "dinov2")]()
+    embedder = EMBEDDERS[os.environ.get("PETMATCH_EMBEDDER", "dinov2-onnx")]()
     embedder.use_cache = False  # vectors live in the database
     return MatchService(Store(os.environ.get("PETMATCH_DB", "petmatch.db")), embedder, claude, notifier,
                         base_url=os.environ.get("PETMATCH_BASE_URL") or os.environ.get("RENDER_EXTERNAL_URL")

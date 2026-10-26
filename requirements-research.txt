@@ -1,0 +1,7 @@
+# Everything in requirements.txt, plus what the research and test scripts need.
+# Install PyTorch first, CPU-only (much smaller):
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+-r requirements.txt
+torch>=2.3            # run_benchmark.py (CLIP, PyTorch DINOv2), run_ranking_eval.py
+transformers>=4.40
+httpx>=0.27           # tests: FastAPI's TestClient
