@@ -1,0 +1,58 @@
+[
+ {
+  "id": "intro",
+  "start_s": 1.21
+ },
+ {
+  "id": "photo",
+  "start_s": 8.51
+ },
+ {
+  "id": "pin",
+  "start_s": 12.4
+ },
+ {
+  "id": "phone",
+  "start_s": 15.57
+ },
+ {
+  "id": "ranked",
+  "start_s": 21.78
+ },
+ {
+  "id": "reasons",
+  "start_s": 27.02
+ },
+ {
+  "id": "owner",
+  "start_s": 34.15
+ },
+ {
+  "id": "privacy",
+  "start_s": 39.29
+ },
+ {
+  "id": "import",
+  "start_s": 47.2
+ },
+ {
+  "id": "filled",
+  "start_s": 53.28
+ },
+ {
+  "id": "rtl",
+  "start_s": 57.07
+ },
+ {
+  "id": "results1",
+  "start_s": 62.44
+ },
+ {
+  "id": "results2",
+  "start_s": 70.35
+ },
+ {
+  "id": "results3",
+  "start_s": 76.19
+ }
+]

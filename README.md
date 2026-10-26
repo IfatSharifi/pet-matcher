@@ -4,7 +4,7 @@ A Hebrew-first web app that matches lost-pet reports with found-pet reports. A f
 
 Every step is measured: image models, Claude's extraction, and the final ranking each have an eval with logged results below.
 
-**Demo video:** [`docs/demo.mp4`](docs/demo.mp4) (68 s, phone format, captioned). Voiceover script: [`docs/demo-script.md`](docs/demo-script.md).
+**Demo video:** [`docs/demo.mp4`](docs/demo.mp4): 84 s, phone format, Hebrew captions and Hebrew voiceover. How it's made, and how to re-record it: [`docs/demo-script.md`](docs/demo-script.md).
 
 **Try it in 3 commands** (after the one-time setup further down):
 
@@ -193,6 +193,8 @@ What the blueprint sets up:
 
 **Rehearsed before shipping:** `deploy/build.sh` and `deploy/start.sh` were run on a fresh clone exactly as Render runs them, except the CPU-PyTorch download line, which was blocked in the build environment. The server started with no network access to Hugging Face, so the model came from the build. A found-dog request matched the right dog first, and a restart kept all reports without reseeding.
 
+**Bug found while recording the demo:** the matches page loads several photos at once, and a single shared SQLite connection broke under parallel requests: errors, and rows mixed between requests. Fixed with one connection per thread plus SQLite's WAL mode; `tests/test_store_threads.py` reproduces it.
+
 **Not done yet:** real email (add `RESEND_API_KEY`; Resend's test sender only delivers to your own address until you verify a domain), and Postgres if it ever needs more than one server.
 
 **To save money,** suspend the service in Render between demos; billing is per second.
@@ -278,7 +280,8 @@ petmatch\notify.py      email alerts (console or Resend) and the Hebrew email
 app.py                  FastAPI pages + JSON API, rate limit, health check
 templates\, static\     Hebrew RTL pages, CSS, self-hosted fonts and Leaflet
 scripts\seed_demo.py    demo database of lost dogs (no API calls)
-scripts\record_demo.py  records the captioned demo video
+scripts\make_voiceover.py  Hebrew voiceover, best-of-N takes judged by Hebrew Whisper
+scripts\record_demo.py  records the narrated demo video in sync with the voiceover
 render.yaml, deploy\    Render blueprint, build and start scripts
 docs\                   demo video, voiceover script, screenshots
 run_ranking_eval.py     ranking eval: ablations x scenarios

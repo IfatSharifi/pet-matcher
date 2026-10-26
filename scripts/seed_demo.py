@@ -69,6 +69,7 @@ def main() -> None:
     found_list = Path(args.db + ".found.txt")
     found_list.write_text("\n".join(f"{queries[p].path}\t{lost[p][0].city}\t{lost[p][0].lat:.5f},{lost[p][0].lon:.5f}"
                                     for p in dogs) + "\n", encoding="utf-8")
+    store.close()  # writes everything into the .db file, so it can be copied on its own
     print(f"Seeded {len(dogs)} lost reports into {args.db}; test photos in {found_list}")
 
 

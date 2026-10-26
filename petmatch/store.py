@@ -96,10 +96,35 @@ class Store:
     def __init__(self, path: str | Path = "petmatch.db") -> None:
         self.path = str(path)
         self._lock = threading.Lock()  # one writer at a time; web servers call from threads
-        self.db = sqlite3.connect(self.path, check_same_thread=False)
-        self.db.row_factory = sqlite3.Row
-        self.db.execute("PRAGMA foreign_keys = ON")
+        self._local = threading.local()
+        self._conns: list[sqlite3.Connection] = []
+        self._conns_lock = threading.Lock()
+        self.db.execute("PRAGMA journal_mode = WAL")  # readers don't block the writer, or each other
         self.db.executescript(SCHEMA)
+
+    @property
+    def db(self) -> sqlite3.Connection:
+        """One connection per thread. A single shared connection breaks when the web server
+        answers several requests at once (e.g. the 5 photos on a matches page)."""
+        conn = getattr(self._local, "conn", None)
+        if conn is None:
+            conn = sqlite3.connect(self.path, timeout=30, check_same_thread=False)  # closed from close()
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA foreign_keys = ON")
+            self._local.conn = conn
+            with self._conns_lock:
+                self._conns.append(conn)
+        return conn
+
+    def close(self) -> None:
+        """Fold the write-ahead log into the main file and close every thread's connection."""
+        with self._conns_lock:
+            for i, conn in enumerate(self._conns):
+                if i == 0:
+                    conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                conn.close()
+            self._conns.clear()
+        self._local = threading.local()
 
     # ---- reports
     def add_report(self, r: Report, photos: list[tuple[str, np.ndarray]] = ()) -> int:

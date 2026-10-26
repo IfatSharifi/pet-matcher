@@ -54,7 +54,7 @@ class AppTest(unittest.TestCase):
         self.client = TestClient(create_app(self.svc, self.uploads))
 
     def tearDown(self):
-        self.svc.store.db.close()
+        self.svc.store.close()
         E.CACHE_DIR = self.old_cache
         self.tmp.cleanup()
 

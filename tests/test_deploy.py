@@ -44,7 +44,7 @@ class DeployTest(unittest.TestCase):
         self.RateLimiter = RateLimiter
 
     def tearDown(self):
-        self.svc.store.db.close()
+        self.svc.store.close()
         E.CACHE_DIR = self.old_cache
         self.tmp.cleanup()
 

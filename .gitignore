@@ -10,3 +10,7 @@ uploads/
 demo_uploads/
 var/
 seed/
+
+build/
+*.db-wal
+*.db-shm
