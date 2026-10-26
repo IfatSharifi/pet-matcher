@@ -188,6 +188,7 @@ FastAPI + Jinja2 pages in Hebrew (right-to-left, mobile first), SQLite storage, 
 | Peak memory, server under load | ~900 MB | **286 MB** |
 | Installed packages | several GB | **194 MB** |
 | Vectors vs PyTorch | - | cosine > 0.9999 on real photos (`tests/test_onnx_embedder.py`) |
+| Full benchmark, 1,393 dogs (seed 0) | recall@1 85.71%, recall@5 94.83%, MRR 0.8979 | **identical: 85.71%, 94.83%, 0.8979** |
 | Render plan needed | 2 GB, $25/month | **free, 512 MB** |
 
 What the blueprint sets up:

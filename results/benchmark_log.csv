@@ -8,3 +8,4 @@ timestamp,dataset,seed,model,queries,gallery_photos,gallery_pets,recall@1,recall
 2026-10-25T16:06:38,dogfacenet,1,dinov2-small,1393,6970,1393,0.8457,0.9548,0.8934,0.1
 2026-10-25T16:06:42,dogfacenet,2,clip-vit-b32,1393,6970,1393,0.5808,0.738,0.6495,0.1
 2026-10-25T16:06:43,dogfacenet,2,dinov2-small,1393,6970,1393,0.8492,0.9497,0.8931,0.1
+2026-10-26T17:50:49,dogfacenet,0,dinov2-small-onnx,1393,6970,1393,0.8571,0.9483,0.8979,537.4
