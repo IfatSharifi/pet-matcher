@@ -172,44 +172,59 @@ FastAPI + Jinja2 pages in Hebrew (right-to-left, mobile first), SQLite storage, 
 
 **Environment variables:** `ANTHROPIC_API_KEY` (photo descriptions + screenshot import; optional), `RESEND_API_KEY` (real email; without it emails print to the console), `PETMATCH_DB`, `PETMATCH_UPLOADS`, `PETMATCH_EMBEDDER` (`dinov2` or `histogram`), `PETMATCH_BASE_URL` (for email links).
 
-## Days 9-10: deploy to Render
+## Days 9-10: deploy to Render, free
 
 `render.yaml` describes the whole service, so deploying is a few clicks:
 
-1. Push this folder to a GitHub repository (a fresh repo; `.gitignore` already keeps data, databases and keys out).
+1. Push this folder to a GitHub repository (a fresh repo; `.gitignore` already keeps data, databases, models and keys out).
 2. In the [Render dashboard](https://dashboard.render.com): **New > Blueprint**, pick the repository.
 3. When Render asks for `ANTHROPIC_API_KEY`, paste a key created only for this server (Claude Console, in a workspace with a monthly spend limit). Never put a key in the repository or a chat.
-4. Click **Apply**. The first build takes about 5-8 minutes: CPU-only PyTorch, the DINOv2 model, and a demo database of 300 DogFaceNet dogs. The site then lives at `https://pet-matcher-xxxx.onrender.com`.
+4. Click **Deploy Blueprint**. The first build takes about 4 minutes: the server packages, the DINOv2 model and a demo database of 300 DogFaceNet dogs. The site then lives at `https://pet-matcher-xxxx.onrender.com`.
+
+**From $25 to $0 a month: DINOv2 on ONNX Runtime.** The first deployment plan needed a 2 GB server ($25/month) because PyTorch plus DINOv2 peaked at about 900 MB. The server now runs the same model through ONNX Runtime ([onnx-community/dinov2-small](https://huggingface.co/onnx-community/dinov2-small)) with DINOv2's preprocessing rewritten in numpy, and never installs PyTorch.
+
+| | PyTorch | ONNX Runtime |
+| --- | --- | --- |
+| Peak memory, server under load | ~900 MB | **286 MB** |
+| Installed packages | several GB | **194 MB** |
+| Vectors vs PyTorch | - | cosine > 0.9999 on real photos (`tests/test_onnx_embedder.py`) |
+| Render plan needed | 2 GB, $25/month | **free, 512 MB** |
 
 What the blueprint sets up:
 
 | Setting | Value | Why |
 | --- | --- | --- |
-| Plan | `1c-2g`: 1 CPU, 2 GB, $25/month, billed per second | The app peaks around 0.9 GB with DINOv2 loaded; the free 512 MB tier is too small, and only paid plans get a disk |
-| Disk | 1 GB at `var/`, $0.25/month | Reports and uploaded photos survive deploys and restarts; Render snapshots it daily |
+| Plan | `free` | 512 MB is enough at 286 MB peak. It sleeps after 15 minutes without visitors; the next visit takes about a minute to wake it |
+| Storage | none (free plans have no disk) | Every restart starts again from the 300 demo dogs; reports visitors add are lost then. Fine for a portfolio demo |
 | Region | Frankfurt | Closest to Israel |
 | Claude limits | 20 calls per visitor per hour, 300 per day | A public demo spends your credit; past the limit, reports still save and match by photo |
-| Demo mode | `PETMATCH_DEMO=1` | Banner saying it's a demo; seeds the 300 dogs on first start only |
+| Demo mode | `PETMATCH_DEMO=1` | Banner saying it's a demo; seeds the 300 dogs on start |
 
-**Rehearsed before shipping:** `deploy/build.sh` and `deploy/start.sh` were run on a fresh clone exactly as Render runs them, except the CPU-PyTorch download line, which was blocked in the build environment. The server started with no network access to Hugging Face, so the model came from the build. A found-dog request matched the right dog first, and a restart kept all reports without reseeding.
+**To keep reports and stay awake:** in `render.yaml` set `plan: 0.5c-512mb` ($7/month) and uncomment the `disk` block ($0.25/month).
+
+**Rehearsed before shipping:** a fresh clone and a brand-new Python environment built only from `requirements.txt` (no PyTorch anywhere), then `deploy/build.sh` and `deploy/start.sh` exactly as Render runs them. Under 8 simultaneous found-dog reports and 60 simultaneous photo loads, the server peaked at 286 MB with no errors, and all 8 reports ranked the right dog first. After wiping its data and restarting, it reseeded the 300 dogs on its own.
 
 **Bug found while recording the demo:** the matches page loads several photos at once, and a single shared SQLite connection broke under parallel requests: errors, and rows mixed between requests. Fixed with one connection per thread plus SQLite's WAL mode; `tests/test_store_threads.py` reproduces it.
 
 **Not done yet:** real email (add `RESEND_API_KEY`; Resend's test sender only delivers to your own address until you verify a domain), and Postgres if it ever needs more than one server.
 
-**To save money,** suspend the service in Render between demos; billing is per second.
-
 ## Setup on Windows (one time)
 
 1. Install **Python 3.13** from python.org and tick "Add python.exe to PATH".
 2. Unzip this folder, e.g. to `Documents\pet-matcher`, and open PowerShell there.
-3. Create a virtual environment and install packages:
+3. Create a virtual environment and install packages. For the app and the demo only:
 
 ```powershell
 py -3.13 -m venv .venv
 .venv\Scripts\Activate.ps1
-pip install torch --index-url https://download.pytorch.org/whl/cpu
 pip install -r requirements.txt
+```
+
+For the research scripts too (benchmarks with CLIP and PyTorch DINOv2, ranking eval, tests):
+
+```powershell
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+pip install -r requirements-research.txt
 ```
 
 If PowerShell blocks the activate script, run once: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
@@ -265,7 +280,8 @@ For each pet with 2+ photos, one random photo is the "found" report (query) and 
 
 ```
 petmatch\data.py        load folders or CSV, make the query/gallery split
-petmatch\embedders.py   histogram, CLIP and DINOv2 embedders + disk cache
+petmatch\embedders.py   histogram, CLIP, DINOv2 (PyTorch) and DINOv2 (ONNX, used by the app)
+requirements.txt        server only; requirements-research.txt adds PyTorch for research
 petmatch\index.py       in-memory cosine vector index (pgvector replaces it in the API phase)
 petmatch\metrics.py     recall@k, MRR, de-duplicated ranks
 petmatch\schemas.py     JSON schemas Claude fills + checks against the API's schema rules
