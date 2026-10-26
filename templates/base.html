@@ -8,6 +8,12 @@
   {% block head %}{% endblock %}
 </head>
 <body>
+  {% if DEMO %}
+  <p class="demo-banner" role="note">
+    זהו אתר הדגמה של פרויקט. הכלבים שמופיעים כאן לדוגמה בלבד, ומיילים לא נשלחים באמת.
+    אם חיה שלכם באמת נעלמה, דווחו גם לווטרינר העירוני ובקבוצות האזוריות.
+  </p>
+  {% endif %}
   <header class="site">
     <a class="brand" href="/">חוזרים הביתה</a>
     <span class="tagline">לוח אבודים ונמצאים לחיות מחמד</span>

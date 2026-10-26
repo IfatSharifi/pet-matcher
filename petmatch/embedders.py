@@ -6,6 +6,7 @@ Embeddings are cached on disk too, so re-running the benchmark is fast.
 from __future__ import annotations
 
 import hashlib
+import threading
 from pathlib import Path
 
 import numpy as np
@@ -19,11 +20,22 @@ def _open_rgb(path: Path) -> Image.Image:
         return im.convert("RGB")
 
 
+_LOCK = threading.Lock()  # web servers embed from several threads; one model run at a time
+
+
 class Embedder:
     name = "base"
+    use_cache = True  # the web app turns this off: it stores vectors in its database
 
     def embed(self, paths: list[Path], batch_size: int = 16) -> np.ndarray:
         """Embed images, reusing any photo already embedded by this model (per-photo cache)."""
+        with _LOCK:
+            if not self.use_cache:
+                return np.vstack([self._embed_batch([_open_rgb(p) for p in paths[i:i + batch_size]])
+                                  for i in range(0, len(paths), batch_size)]).astype(np.float32)
+            return self._embed_cached(paths, batch_size)
+
+    def _embed_cached(self, paths: list[Path], batch_size: int) -> np.ndarray:
         cache = self._load_cache()
         keys = [self._key(p) for p in paths]
         todo = [p for p, k in zip(paths, keys) if k not in cache]

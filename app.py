@@ -10,13 +10,18 @@ Environment:
     PETMATCH_DB         SQLite file (default petmatch.db)
     PETMATCH_UPLOADS    photo folder (default uploads)
     PETMATCH_EMBEDDER   dinov2 (default) or histogram (fast, no download - for demos and tests)
-    PETMATCH_BASE_URL   used in email links (default http://localhost:8000)
+    PETMATCH_BASE_URL   used in email links (default: Render's RENDER_EXTERNAL_URL, else localhost)
+    PETMATCH_DEMO       1 = show the "demo site" banner
+    PETMATCH_CLAUDE_PER_HOUR / PETMATCH_CLAUDE_PER_DAY   Claude call limits (default 20 per visitor, 300 per day)
 """
 from __future__ import annotations
 
 import io
 import os
+import threading
+import time
 import uuid
+from collections import defaultdict, deque
 from datetime import date
 from pathlib import Path
 
@@ -53,8 +58,37 @@ ERRORS_HE = {
     "too_many": f"אפשר להעלות עד {MAX_PHOTOS} תמונות.",
     "bad_date": "התאריך לא תקין.",
     "needs_claude": "קריאת צילומי מסך לא פעילה כרגע. מלאו את הפרטים ידנית.",
+    "claude_failed": "לא הצלחנו לקרוא את צילום המסך. נסו שוב, או מלאו את הפרטים ידנית.",
+    "rate_limited": "קראנו הרבה צילומי מסך מהמכשיר הזה בשעה האחרונה. נסו שוב מאוחר יותר, או מלאו את הפרטים ידנית.",
     "no_report": "הדיווח לא נמצא.",
 }
+
+
+class RateLimiter:
+    """Caps Claude calls per visitor per hour and for the whole site per day.
+
+    A public demo spends the owner's API credit on every photo and screenshot;
+    this keeps one visitor (or a bot) from running up the bill. In memory: resets on restart.
+    """
+    def __init__(self, per_ip_per_hour: int, per_day: int) -> None:
+        self.per_ip, self.per_day = per_ip_per_hour, per_day
+        self.hits: dict[str, deque] = defaultdict(deque)
+        self.day, self.today_count = date.today(), 0
+        self.lock = threading.Lock()
+
+    def allow(self, ip: str) -> bool:
+        now = time.monotonic()
+        with self.lock:
+            if date.today() != self.day:
+                self.day, self.today_count = date.today(), 0
+            q = self.hits[ip]
+            while q and now - q[0] > 3600:
+                q.popleft()
+            if len(q) >= self.per_ip or self.today_count >= self.per_day:
+                return False
+            q.append(now)
+            self.today_count += 1
+            return True
 
 
 def save_image(upload: UploadFile, folder: Path) -> Path:
@@ -89,12 +123,17 @@ def opt_float(s: str | None) -> float | None:
         return None
 
 
-def create_app(service: MatchService, upload_dir: str | Path = "uploads") -> FastAPI:
+def create_app(service: MatchService, upload_dir: str | Path = "uploads", limiter: RateLimiter | None = None,
+               demo: bool = False) -> FastAPI:
     app = FastAPI(title="Pet Matcher", docs_url="/api/docs")
+    limiter = limiter or RateLimiter(per_ip_per_hour=10**9, per_day=10**9)
+
+    def ip(request: Request) -> str:
+        return request.client.host if request.client else "unknown"
     uploads = Path(upload_dir)
     app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
     templates = Jinja2Templates(directory=ROOT / "templates")
-    templates.env.globals.update(COLORS=COLORS, HE_COLORS=HE_COLORS, SWATCHES=SWATCHES, SPECIES_HE=SPECIES_HE,
+    templates.env.globals.update(DEMO=demo, COLORS=COLORS, HE_COLORS=HE_COLORS, SWATCHES=SWATCHES, SPECIES_HE=SPECIES_HE,
                                  ALERT_THRESHOLD=ALERT_THRESHOLD, today=lambda: date.today().isoformat())
     templates.env.filters["he_colors"] = lambda cs: ", ".join(HE_COLORS.get(c, c) for c in cs)
 
@@ -108,6 +147,10 @@ def create_app(service: MatchService, upload_dir: str | Path = "uploads") -> Fas
         return [save_image(f, uploads) for f in files]
 
     # ------------------------------------------------------------------ pages
+    @app.get("/health")
+    def health():
+        return {"ok": True, "reports_open": len(service.store.open_reports("lost")) + len(service.store.open_reports("found"))}
+
     @app.get("/", response_class=HTMLResponse)
     def home(request: Request):
         return page(request, "home.html")
@@ -131,7 +174,8 @@ def create_app(service: MatchService, upload_dir: str | Path = "uploads") -> Fas
                 area_text=form.get("area_text") or None, species=form.get("species") or None,
                 colors=colors or None, pet_name=form.get("pet_name") or None,
                 contact_name=form.get("contact_name") or None, contact_phone=form.get("contact_phone") or None,
-                contact_email=form.get("contact_email") or None, source=form.get("source") or "form")
+                contact_email=form.get("contact_email") or None, source=form.get("source") or "form",
+                describe=bool(paths) and limiter.allow(ip(request)))
         except ValidationError as e:
             for p in paths:  # the report wasn't saved: don't keep its photos either
                 p.unlink(missing_ok=True)
@@ -150,6 +194,8 @@ def create_app(service: MatchService, upload_dir: str | Path = "uploads") -> Fas
     @app.post("/import", response_class=HTMLResponse)
     async def import_submit(request: Request, screenshot: UploadFile = File(...)):
         try:
+            if not limiter.allow(ip(request)):
+                raise ValidationError("rate_limited", "too many screenshot reads")
             path = save_image(screenshot, uploads / "screenshots")
             try:
                 draft = service.import_screenshot(path)
@@ -188,7 +234,7 @@ def create_app(service: MatchService, upload_dir: str | Path = "uploads") -> Fas
 
     # ------------------------------------------------------------------ JSON API
     @app.post("/api/reports")
-    async def api_create(side: str = Form(...), event_date: str = Form(...), lat: str = Form(""),
+    async def api_create(request: Request, side: str = Form(...), event_date: str = Form(...), lat: str = Form(""),
                          lon: str = Form(""), area_text: str = Form(""), species: str = Form(""),
                          colors: str = Form(""), pet_name: str = Form(""), contact_name: str = Form(""),
                          contact_phone: str = Form(""), contact_email: str = Form(""),
@@ -201,7 +247,7 @@ def create_app(service: MatchService, upload_dir: str | Path = "uploads") -> Fas
                 area_text=area_text or None, species=species or None,
                 colors=[c.strip() for c in colors.split(",") if c.strip()] or None, pet_name=pet_name or None,
                 contact_name=contact_name or None, contact_phone=contact_phone or None,
-                contact_email=contact_email or None)
+                contact_email=contact_email or None, describe=bool(paths) and limiter.allow(ip(request)))
         except ValidationError as e:
             for p in paths:
                 p.unlink(missing_ok=True)
@@ -224,8 +270,10 @@ def create_app(service: MatchService, upload_dir: str | Path = "uploads") -> Fas
         return {"ok": True}
 
     @app.post("/api/screenshots")
-    async def api_screenshot(screenshot: UploadFile = File(...)):
+    async def api_screenshot(request: Request, screenshot: UploadFile = File(...)):
         try:
+            if not limiter.allow(ip(request)):
+                raise ValidationError("rate_limited", "too many screenshot reads")
             path = save_image(screenshot, uploads / "screenshots")
             try:
                 return service.import_screenshot(path)
@@ -243,12 +291,18 @@ def build_service_from_env() -> MatchService:
     from petmatch.notify import ConsoleNotifier, ResendNotifier
     from petmatch.store import Store
 
-    claude = ClaudeClient() if os.environ.get("ANTHROPIC_API_KEY") else None
+    # no response cache on a server: it would keep strangers' screenshot details on disk
+    claude = ClaudeClient(use_cache=False) if os.environ.get("ANTHROPIC_API_KEY") else None
     notifier = ResendNotifier() if os.environ.get("RESEND_API_KEY") else ConsoleNotifier()
     embedder = EMBEDDERS[os.environ.get("PETMATCH_EMBEDDER", "dinov2")]()
+    embedder.use_cache = False  # vectors live in the database
     return MatchService(Store(os.environ.get("PETMATCH_DB", "petmatch.db")), embedder, claude, notifier,
-                        base_url=os.environ.get("PETMATCH_BASE_URL", "http://localhost:8000"))
+                        base_url=os.environ.get("PETMATCH_BASE_URL") or os.environ.get("RENDER_EXTERNAL_URL")
+                        or "http://localhost:8000")
 
 
 if os.environ.get("PETMATCH_NO_AUTOSTART") != "1":
-    app = create_app(build_service_from_env(), os.environ.get("PETMATCH_UPLOADS", "uploads"))
+    app = create_app(build_service_from_env(), os.environ.get("PETMATCH_UPLOADS", "uploads"),
+                     limiter=RateLimiter(int(os.environ.get("PETMATCH_CLAUDE_PER_HOUR", 20)),
+                                         int(os.environ.get("PETMATCH_CLAUDE_PER_DAY", 300))),
+                     demo=os.environ.get("PETMATCH_DEMO") == "1")

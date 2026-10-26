@@ -1,9 +1,12 @@
 .venv/
 __pycache__/
 .cache/
+.hf_cache/
 data/
 results/misses_*.csv
 *.db
 *.db.found.txt
 uploads/
 demo_uploads/
+var/
+seed/

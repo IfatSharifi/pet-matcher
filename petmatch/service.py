@@ -16,7 +16,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .claude_client import ClaudeClient
+from .claude_client import ClaudeClient, ClaudeError
 from .extract import describe_pet, read_screenshot
 from .notify import Notifier, match_email
 from .ranking import Features, Weights, color_matrix, haversine_matrix, reason_he, score, species_compatible
@@ -81,7 +81,9 @@ class MatchService:
                       species: str | None = None, colors: list[str] | None = None,
                       pet_name: str | None = None, contact_name: str | None = None,
                       contact_phone: str | None = None, contact_email: str | None = None,
-                      source: str = "form", description: dict | None = None) -> int:
+                      source: str = "form", description: dict | None = None, describe: bool = True) -> int:
+        """Save a report and alert matching owners. `describe=False` skips the Claude call
+        (used when a visitor hits the rate limit); photos still match by image."""
         if side not in ("lost", "found"):
             raise ValidationError("side", "side must be 'lost' or 'found'")
         if not (contact_phone or contact_email):
@@ -91,8 +93,11 @@ class MatchService:
         photos = [Path(p) for p in photos]
 
         desc = dict(description or {})
-        if photos and self.claude and not desc:
-            desc = describe_pet(self.claude, photos[:MAX_DESCRIBE_PHOTOS])
+        if photos and self.claude and describe and not desc:
+            try:
+                desc = describe_pet(self.claude, photos[:MAX_DESCRIBE_PHOTOS])
+            except (ClaudeError, ValueError) as e:  # outage or bad key must not lose the report
+                log.warning("describe failed, saving without description: %s", e)
         species = species or desc.get("species") or "unknown"
         colors = colors if colors is not None else desc.get("primary_colors", [])
         if species not in SPECIES:
@@ -125,7 +130,11 @@ class MatchService:
         """Read a lost/found post screenshot into a draft. Nothing is saved: the user confirms first."""
         if not self.claude:
             raise ValidationError("needs_claude", "screenshot import needs a Claude API key")
-        draft = read_screenshot(self.claude, Path(screenshot))
+        try:
+            draft = read_screenshot(self.claude, Path(screenshot))
+        except (ClaudeError, ValueError) as e:
+            log.warning("screenshot read failed: %s", e)
+            raise ValidationError("claude_failed", "could not read the screenshot") from None
         g = geocode(draft.get("area"))
         draft["geocoded"] = {"lat": g[0], "lon": g[1], "city": g[2]} if g else None
         draft["side"] = {"lost": "lost", "found": "found", "sighting": "found"}.get(draft["report_type"])
